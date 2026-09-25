@@ -1,126 +1,149 @@
 # RISE School of Accountancy — ACCA CBT Examination System
 
-A production-lean Computer-Based Testing platform: teachers upload PDF mock
-papers and Claude converts them into structured MCQ exams; students sit an
-authentic ACCA-style CBT with a tamper-resistant timer and get instant,
-itemized feedback; teachers get one centralized, filterable results view
-across every mock and batch.
+A 100%-free Computer-Based Testing platform: the teacher creates mock exams
+from JSON, students sit an authentic ACCA-style CBT with a tamper-resistant
+timer and instant, itemized feedback, and the teacher gets one centralized,
+filterable results view — with **no paid services anywhere** in the stack.
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4
-- **Backend:** Next.js Server Actions + Supabase (Postgres, Auth, Storage)
-- **AI extraction:** Claude (`claude-sonnet-5`) via `@anthropic-ai/sdk`, reading
-  the PDF directly (native document understanding) and returning strict,
-  schema-validated JSON (Zod + `output_config.format`)
-- **Exam timer:** Server-anchored — the countdown deadline lives in
-  `exam_sessions.deadline_at` in Postgres, not just the browser. A student can
-  refresh, close the tab, or switch devices and the timer is exactly where it
-  should be. Zustand + `localStorage` mirrors it locally for instant UI, but
-  the server value is always what's graded against.
+- **Frontend/Backend:** Next.js 16 (App Router), React 19, TypeScript,
+  Tailwind CSS v4, Server Actions
+- **"Database":** Google Sheets, via a Google Apps Script Web App
+  (`google-apps-script/Code.gs`) — completely free, no usage limits that a
+  small school would ever hit
+- **Auth:** a single hardcoded faculty account (email + server-side
+  password) and password-less student identification (Name + RISE/ACCA
+  Student ID + Batch), both backed by a signed cookie — no auth provider
+- **Exam timer:** server-anchored in a `Sessions` sheet — a student can
+  refresh, close the tab, or switch devices and the countdown is exactly
+  where it should be
 
-## 1. Set up Supabase
+## Why Google Apps Script is more than "a database"
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run `supabase/migrations/0001_init.sql`. This creates
-   every table, Row Level Security policy, and the two storage buckets
-   (`mock-pdfs` private, `question-images` public).
-3. In **Authentication → Providers → Email**, turn **off** "Confirm email" —
-   students log in with a Student ID, not a real inbox (see below), so email
-   confirmation links would never be delivered. (Registration also
-   pre-confirms accounts server-side via the admin API either way, but
-   disabling it avoids surprises if you create accounts by hand in the
-   dashboard.)
-4. Copy your Project URL, anon key, and service role key into `.env.local`
-   (copy `.env.local.example` → `.env.local` first).
+Google Sheets has no Row Level Security, so `Code.gs` plays that role
+itself — it's the real trust boundary, not just storage:
 
-### Why students log in with an ID, not an email
+- `getMockForExam` **never returns `correct_option`/`explanation`** —
+  those fields are stripped before the JSON leaves the script
+- `submitExam` **re-reads the answer key itself and grades server-side** —
+  it never trusts a score the browser sends
+- Every teacher write (create/update/publish/archive a mock) requires
+  `TEACHER_TOKEN`, a secret only this app's server ever holds
+  (`GOOGLE_SCRIPT_TEACHER_TOKEN` — never sent to the browser, even though
+  student-facing calls also go through Next.js's server, never directly
+  from the browser, despite the `NEXT_PUBLIC_` prefix on the script URL)
 
-Supabase Auth requires an email address. Students authenticate with their
-RISE/ACCA Student ID, so the app deterministically derives an internal email
-(`rise-2026-0001@students.rise.local`) from the ID — see
-`src/lib/auth.ts::emailFromAccaId`. It's never shown to the student and
-never used to contact anyone; it only exists so Supabase Auth has something
-to key on.
+## 1. Deploy the Google Apps Script backend
 
-## 2. Set up Anthropic
+1. Create a new Google Sheet (sheets.new). **Extensions → Apps Script.**
+2. Delete the default `Code.gs` contents and paste in the whole of
+   `google-apps-script/Code.gs` from this repo.
+3. Run the `setup` function once (function picker at the top → `setup` →
+   ▶ Run). Grant the permissions it asks for.
+4. Open **View → Executions** (or **View → Logs**) and copy the
+   `TEACHER_TOKEN` value it printed.
+5. **Deploy → New deployment → type "Web app"**:
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+6. Copy the Web app URL it gives you (ends in `/exec`).
 
-Add `ANTHROPIC_API_KEY` to `.env.local`. The extraction prompt and schema
-live in `src/lib/anthropic.ts`.
+Whenever you edit `Code.gs` afterwards, you must create a new deployment
+(or a new version under **Manage deployments**) for the change to go live —
+Apps Script Web Apps are versioned, not live-reloaded.
+
+## 2. Configure the app
+
+```bash
+cp .env.local.example .env.local
+```
+
+Fill in:
+
+- `NEXT_PUBLIC_GOOGLE_SCRIPT_URL` — the Web app URL from step 1.6
+- `GOOGLE_SCRIPT_TEACHER_TOKEN` — the token from step 1.4
+- `TEACHER_PASSWORD` — pick a password for the one faculty login
+- `SESSION_SECRET` — any long random string (`openssl rand -hex 32`)
 
 ## 3. Install & run
 
 ```bash
 npm install
-cp .env.local.example .env.local   # fill in the values above
-npm run seed                        # creates the demo accounts below
 npm run dev
 ```
 
+- Faculty: `/teacher/login` with `alipervaiz.ca269@gmail.com` (or whatever
+  you set `NEXT_PUBLIC_TEACHER_EMAIL` to) + `TEACHER_PASSWORD`
+- Students: `/student/login`, just Name + Student ID + Batch, no password
+
 > If your project directory lives on an NTFS/exFAT mount, `node_modules`
-> there is extremely slow (thousands of tiny files over a non-native
-> filesystem). Symlink it to a native-filesystem location instead, e.g.:
-> `mkdir -p ~/.cache/<project>-node_modules && ln -s ~/.cache/<project>-node_modules node_modules`.
+> there is extremely slow. Symlink it to a native-filesystem location
+> instead: `mkdir -p ~/.cache/<project>-node_modules && ln -s ~/.cache/<project>-node_modules node_modules`.
 
-## Demo credentials
+## The trade-off, stated plainly
 
-`npm run seed` creates one faculty account and one student account using the
-`SEED_*` values in `.env.local` (defaults shown below — **change these
-before deploying anywhere real**):
+Students are **not authenticated** — there is no password check, so
+anyone who knows (or guesses) a Student ID can submit a result under that
+name. This is the direct cost of "no paid database, no auth provider": a
+real per-student credential would need somewhere trusted to store a
+password hash, which is exactly the kind of service this version removes.
+For a low-stakes practice-mock tool inside a school where the teacher
+already knows their students, that trade is usually fine — just know it's
+being made. Duplicate attempts are still blocked (one result per
+mock+Student ID, enforced in `Code.gs`), and the teacher's own account is
+still a real password check.
 
-| Role    | Login              | Value                    | Password       |
-| ------- | ------------------ | ------------------------ | -------------- |
-| Teacher | Faculty email       | `ali.pervaiz@riseacademy.edu.pk` | `ChangeMe123!` |
-| Student | RISE/ACCA Student ID| `RISE-2026-0001`         | `ChangeMe123!` |
+## Creating a mock (teacher)
 
-Students can also self-register at `/student/register` (ID + name + batch +
-password). Faculty accounts are provisioned by an administrator — either via
-`npm run seed` / the seed script's env vars for more teachers, or directly in
-the Supabase dashboard (create the `auth.users` row, then insert a matching
-`public.users` row with `role = 'teacher'`).
+Go to `/teacher/create-mock` and either drop a `.json` file or paste raw
+JSON:
 
-## How the pieces fit together
+```json
+{
+  "mock_name": "FA1 Mock 01",
+  "subject": "FA1",
+  "time_limit_minutes": 120,
+  "pass_percentage": 50,
+  "questions": [
+    {
+      "question_number": 1,
+      "question_text": "Which of the following is a current asset?",
+      "option_a": "Land",
+      "option_b": "Inventory",
+      "option_c": "Goodwill",
+      "option_d": "Machinery",
+      "correct_option": "B",
+      "explanation": "Inventory converts to cash within one operating cycle.",
+      "marks": 2
+    }
+  ]
+}
+```
 
-- **Answer-key security:** the `questions` table (which holds
-  `correct_option`/`explanation`) has no student-facing RLS policy at all.
-  Every place a student needs exam content — taking the exam, reviewing
-  results — goes through a Server Component or Server Action using the
-  Supabase **service role** client (`src/lib/supabase/admin.ts`), which
-  explicitly selects only the safe columns and strips the rest before the
-  data is ever serialized to the browser.
-- **Timer:** `beginExam` (`src/lib/actions/exam.ts`) creates the
-  `exam_sessions` row with `deadline_at = now() + time_limit_minutes` on
-  first visit. The exam client (`src/app/exam/[mockId]/take/exam-room.tsx`)
-  computes remaining time from that timestamp every second and auto-submits
-  at zero. Progress (answers, flags, current question) autosaves to the same
-  row every 15s and on `beforeunload`.
-- **Grading:** `submitExam` re-fetches the answer key server-side and scores
-  the submission there — the client never sees `correct_option` before
-  submitting, so there's nothing to tamper with in the browser.
-- **PDF → MCQs:** `uploadAndParsePdf` (`src/lib/actions/mocks.ts`) stores the
-  original PDF in the `mock-pdfs` bucket, sends it to Claude as a `document`
-  content block, and inserts the parsed questions as a `draft` mock. Nothing
-  is visible to students until the teacher reviews it at
-  `/teacher/review/[mockId]` and clicks Publish.
+It's validated live (schema + duplicate question numbers) with a preview
+before you can continue. After that you land on the review screen to
+double-check questions, set the time limit/pass mark, assign batches, and
+publish.
 
 ## Project structure
 
 ```
+google-apps-script/Code.gs   The entire backend — deploy this to Google
 src/
   app/
-    student/              Student auth + dashboard
-    teacher/               Faculty auth, upload, review/edit, results
-    exam/[mockId]/          Pre-exam screen, live CBT engine, result review
+    student/                 Student sign-in (no password) + dashboard
+    teacher/                 Faculty login, create-mock, review/edit, results
+    exam/[mockId]/            Pre-exam screen, live CBT engine, result review
   components/
-    ui/                    Small hand-rolled primitives (button, card, dialog, …)
-    shared/                 Brand header, portal shell/nav
+    ui/                       Small hand-rolled primitives
+    shared/                    Brand header, portal shell/nav
   lib/
-    actions/                Server Actions (auth, mocks, exam)
-    supabase/               Browser / server / admin (service-role) clients
-    anthropic.ts            PDF → structured MCQ extraction
-    scoring.ts               Grading logic
+    actions/                   Server Actions (auth, mocks, exam)
+    sheets.ts                  The only place that talks to Apps Script
+    session.ts                 Signed-cookie session (HMAC-SHA256, no DB)
+    mockSchema.ts               Zod schema for the teacher's JSON upload
     auth.ts, types.ts, constants.ts, utils.ts
-  store/examStore.ts        Zustand store mirroring the live exam session
-supabase/migrations/0001_init.sql
-scripts/seed.ts
+  store/examStore.ts           Zustand store mirroring the live exam session
+  proxy.ts                     Route protection by role (Next 16's renamed
+                                "middleware" — reads the session cookie)
 ```
