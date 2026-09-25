@@ -1,153 +1,83 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { emailFromAccaId } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { signSession, verifySession } from "@/lib/session";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  TEACHER_EMAIL,
+  TEACHER_NAME,
+} from "@/lib/constants";
 
 export interface AuthActionState {
   error?: string;
 }
 
-export async function studentLogin(
-  _prev: AuthActionState,
-  formData: FormData,
-): Promise<AuthActionState> {
-  const accaId = String(formData.get("acca_id") || "").trim();
-  const password = String(formData.get("password") || "");
-
-  if (!accaId || !password) {
-    return { error: "Enter your RISE/ACCA Student ID and password." };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: emailFromAccaId(accaId),
-    password,
+async function setSessionCookie(token: string) {
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    path: "/",
   });
-
-  if (error || !data.user) {
-    return { error: "Invalid Student ID or password." };
-  }
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  if (profile?.role !== "student") {
-    await supabase.auth.signOut();
-    return { error: "This account is not registered as a student." };
-  }
-
-  redirect("/student/dashboard");
 }
 
-export async function studentRegister(
-  _prev: AuthActionState,
-  formData: FormData,
-): Promise<AuthActionState> {
-  const fullName = String(formData.get("full_name") || "").trim();
-  const accaId = String(formData.get("acca_id") || "").trim();
-  const batch = String(formData.get("batch") || "").trim();
-  const password = String(formData.get("password") || "");
-  const confirmPassword = String(formData.get("confirm_password") || "");
-
-  if (!fullName || !accaId || !batch || !password) {
-    return { error: "All fields are required." };
-  }
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
-  }
-  if (password !== confirmPassword) {
-    return { error: "Passwords do not match." };
-  }
-
-  const admin = createAdminClient();
-  const email = emailFromAccaId(accaId);
-
-  const { data: existing } = await admin
-    .from("users")
-    .select("id")
-    .eq("acca_id", accaId)
-    .maybeSingle();
-  if (existing) {
-    return { error: "An account with this Student ID already exists." };
-  }
-
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName, acca_id: accaId, batch, role: "student" },
-  });
-
-  if (createError || !created.user) {
-    return { error: createError?.message ?? "Could not create account." };
-  }
-
-  const { error: insertError } = await admin.from("users").insert({
-    id: created.user.id,
-    email,
-    full_name: fullName,
-    acca_id: accaId,
-    batch,
-    role: "student",
-  });
-
-  if (insertError) {
-    await admin.auth.admin.deleteUser(created.user.id);
-    return { error: "Could not create account. Please try again." };
-  }
-
-  const supabase = await createClient();
-  await supabase.auth.signInWithPassword({ email, password });
-
-  redirect("/student/dashboard");
-}
-
+/**
+ * Single-admin login: there is no teacher database row, just one email
+ * fixed at build time (TEACHER_EMAIL) checked against a server-only
+ * password (TEACHER_PASSWORD, never sent to the browser). This is the
+ * closest zero-cost equivalent to Supabase Auth for exactly one account.
+ */
 export async function teacherLogin(
   _prev: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
-  const email = String(formData.get("email") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
   if (!email || !password) {
     return { error: "Enter your email and password." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error || !data.user) {
+  const expectedPassword = process.env.TEACHER_PASSWORD;
+  if (!expectedPassword) {
+    return { error: "Server is missing TEACHER_PASSWORD — set it in .env.local." };
+  }
+  if (email !== TEACHER_EMAIL || password !== expectedPassword) {
     return { error: "Invalid email or password." };
   }
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  if (profile?.role !== "teacher") {
-    await supabase.auth.signOut();
-    return { error: "This account is not registered as faculty." };
-  }
-
+  await setSessionCookie(signSession({ role: "teacher", email: TEACHER_EMAIL, full_name: TEACHER_NAME }));
   redirect("/teacher/dashboard");
 }
 
-export async function logout(): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = user
-    ? await supabase.from("users").select("role").eq("id", user.id).single()
-    : { data: null };
+/**
+ * Students identify with Name + RISE/ACCA Student ID + Batch — no password.
+ * There is no student database to check against; the signed cookie is what
+ * proxy.ts and every Server Action trust afterwards.
+ */
+export async function studentLogin(
+  _prev: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const fullName = String(formData.get("full_name") || "").trim();
+  const accaId = String(formData.get("acca_id") || "").trim();
+  const batch = String(formData.get("batch") || "").trim();
 
-  await supabase.auth.signOut();
-  redirect(profile?.role === "teacher" ? "/teacher/login" : "/student/login");
+  if (!fullName || !accaId || !batch) {
+    return { error: "Enter your name, Student ID, and batch." };
+  }
+
+  await setSessionCookie(signSession({ role: "student", full_name: fullName, acca_id: accaId, batch }));
+  redirect("/student/dashboard");
+}
+
+export async function logout(): Promise<void> {
+  const jar = await cookies();
+  const current = verifySession(jar.get(SESSION_COOKIE_NAME)?.value);
+  jar.delete(SESSION_COOKIE_NAME);
+  redirect(current?.role === "teacher" ? "/teacher/login" : "/student/login");
 }

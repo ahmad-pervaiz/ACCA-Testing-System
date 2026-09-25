@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { BrandHeader } from "@/components/shared/brand-header";
-import type { AppUser } from "@/lib/types";
+import type { SessionUser } from "@/lib/types";
 
 interface NavLink {
   href: string;
@@ -16,7 +16,7 @@ export function PortalShell({
   links,
   children,
 }: {
-  user: AppUser;
+  user: SessionUser;
   tagline: string;
   links: NavLink[];
   children: ReactNode;
@@ -41,7 +41,7 @@ export function PortalShell({
             <div className="text-right">
               <p className="text-sm font-medium leading-tight text-foreground">{user.full_name}</p>
               <p className="text-xs leading-tight text-muted-foreground">
-                {user.acca_id ?? user.email}
+                {user.role === "student" ? `${user.acca_id} · ${user.batch}` : user.email}
               </p>
             </div>
             <form action={logout}>

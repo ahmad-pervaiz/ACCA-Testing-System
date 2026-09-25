@@ -1,8 +1,13 @@
 export const SCHOOL_NAME =
   process.env.NEXT_PUBLIC_SCHOOL_NAME || "RISE School of Accountancy";
 
-export const STUDENT_AUTH_EMAIL_DOMAIN =
-  process.env.STUDENT_AUTH_EMAIL_DOMAIN || "students.rise.local";
+export const TEACHER_EMAIL = (
+  process.env.NEXT_PUBLIC_TEACHER_EMAIL || "alipervaiz.ca269@gmail.com"
+).toLowerCase();
+
+export const TEACHER_NAME = process.env.NEXT_PUBLIC_TEACHER_NAME || "Ali Pervaiz";
+
+export const GOOGLE_SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL || "";
 
 export const SUBJECTS = [
   "FA1",
@@ -36,3 +41,7 @@ export const DEFAULT_PASS_PERCENTAGE = 50;
 export const AUTOSAVE_INTERVAL_MS = 15_000;
 /** Warn the student when this many seconds remain. */
 export const LOW_TIME_WARNING_SECONDS = 5 * 60;
+
+/** Signed-cookie session name and max age (30 days). */
+export const SESSION_COOKIE_NAME = "acca_cbt_session";
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
