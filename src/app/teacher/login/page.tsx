@@ -26,7 +26,7 @@ export default function TeacherLoginPage() {
           <form action={formAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="ali.pervaiz@riseacademy.edu.pk" required autoFocus />
+              <Input id="email" name="email" type="email" placeholder="alipervaiz.ca269@gmail.com" required autoFocus />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password">Password</Label>
@@ -43,7 +43,7 @@ export default function TeacherLoginPage() {
           </form>
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            Faculty accounts are provisioned by the school administrator.
+            Single faculty account, configured in the server environment.
           </p>
         </CardContent>
       </Card>

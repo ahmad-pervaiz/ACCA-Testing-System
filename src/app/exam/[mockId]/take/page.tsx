@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import * as sheets from "@/lib/sheets";
 import { ExamRoom } from "./exam-room";
-import type { ExamQuestion } from "@/lib/types";
 
 export default async function TakeExamPage({
   params,
@@ -11,42 +10,18 @@ export default async function TakeExamPage({
 }) {
   const { mockId } = await params;
   const user = await requireUser("student");
-  const admin = createAdminClient();
+  if (user.role !== "student") return null;
 
-  const { data: existingResult } = await admin
-    .from("exam_results")
-    .select("id")
-    .eq("mock_id", mockId)
-    .eq("student_id", user.id)
-    .maybeSingle();
+  const existingResult = await sheets.getResult(mockId, user.acca_id);
   if (existingResult) redirect(`/exam/${mockId}/result`);
 
-  const { data: session } = await admin
-    .from("exam_sessions")
-    .select("*")
-    .eq("mock_id", mockId)
-    .eq("student_id", user.id)
-    .maybeSingle();
+  const session = await sheets.getSession(mockId, user.acca_id);
   if (!session) redirect(`/exam/${mockId}`);
 
-  const { data: mock } = await admin.from("mocks").select("*").eq("id", mockId).single();
+  // Answer key is deliberately never fetched here — getMockForExam strips
+  // correct_option/explanation server-side in Code.gs before this ever runs.
+  const mock = await sheets.getMockForExam(mockId).catch(() => null);
   if (!mock) notFound();
 
-  // Answer key is deliberately never selected here — only fields safe to
-  // show a student mid-exam are fetched.
-  const { data: questions } = await admin
-    .from("questions")
-    .select(
-      "id, mock_id, question_number, question_text, image_url, option_a, option_b, option_c, option_d, marks",
-    )
-    .eq("mock_id", mockId)
-    .order("question_number", { ascending: true });
-
-  return (
-    <ExamRoom
-      mock={mock}
-      questions={(questions ?? []) as ExamQuestion[]}
-      session={session}
-    />
-  );
+  return <ExamRoom mock={mock} questions={mock.questions} session={session} />;
 }

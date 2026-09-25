@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Upload, BarChart3, FileText, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import * as sheets from "@/lib/sheets";
 import { PortalShell } from "@/components/shared/portal-shell";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,56 +11,42 @@ import { formatDate } from "@/lib/utils";
 
 const TEACHER_LINKS = [
   { href: "/teacher/dashboard", label: "Dashboard" },
-  { href: "/teacher/upload", label: "Upload Mock" },
+  { href: "/teacher/create-mock", label: "Create Mock" },
   { href: "/teacher/results", label: "Results" },
 ];
 
 export default async function TeacherDashboardPage() {
   const user = await requireUser("teacher");
-  const supabase = await createClient();
 
-  const { data: mocks } = await supabase
-    .from("mocks")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(8);
+  const [mocks, results] = await Promise.all([
+    sheets.listAllMocksForTeacher(),
+    sheets.listResultsForTeacher(),
+  ]);
 
-  const { count: publishedCount } = await supabase
-    .from("mocks")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "published");
-
-  const { count: draftCount } = await supabase
-    .from("mocks")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "draft");
-
-  const { count: studentCount } = await supabase
-    .from("users")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "student");
-
-  const { count: submissionCount } = await supabase
-    .from("exam_results")
-    .select("*", { count: "exact", head: true });
+  const publishedCount = mocks.filter((m) => m.status === "published").length;
+  const draftCount = mocks.filter((m) => m.status === "draft").length;
+  const studentCount = new Set(results.map((r) => r.acca_id)).size;
+  const recent = [...mocks]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 8);
 
   return (
     <PortalShell user={user} tagline="Faculty Portal" links={TEACHER_LINKS}>
       <div className="flex flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-foreground">Faculty Dashboard</h1>
-          <Link href="/teacher/upload">
+          <Link href="/teacher/create-mock">
             <Button>
-              <Upload className="h-4 w-4" /> Upload New Mock
+              <Upload className="h-4 w-4" /> Create New Mock
             </Button>
           </Link>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={<FileText className="h-5 w-5" />} label="Published Mocks" value={publishedCount ?? 0} />
-          <StatCard icon={<FileText className="h-5 w-5" />} label="Drafts Pending Review" value={draftCount ?? 0} />
-          <StatCard icon={<Users className="h-5 w-5" />} label="Registered Students" value={studentCount ?? 0} />
-          <StatCard icon={<BarChart3 className="h-5 w-5" />} label="Total Submissions" value={submissionCount ?? 0} />
+          <StatCard icon={<FileText className="h-5 w-5" />} label="Published Mocks" value={publishedCount} />
+          <StatCard icon={<FileText className="h-5 w-5" />} label="Drafts Pending Review" value={draftCount} />
+          <StatCard icon={<Users className="h-5 w-5" />} label="Students With Results" value={studentCount} />
+          <StatCard icon={<BarChart3 className="h-5 w-5" />} label="Total Submissions" value={results.length} />
         </div>
 
         <section>
@@ -83,14 +69,14 @@ export default async function TeacherDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(mocks ?? []).length === 0 && (
+                  {recent.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">
-                        No mocks uploaded yet.
+                        No mocks created yet.
                       </td>
                     </tr>
                   )}
-                  {(mocks ?? []).map((m) => (
+                  {recent.map((m) => (
                     <tr key={m.id} className="border-b border-border last:border-0">
                       <td className="px-5 py-3 font-medium text-foreground">{m.mock_name}</td>
                       <td className="px-5 py-3">{m.subject}</td>

@@ -10,14 +10,14 @@ import { Dialog } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration, cn } from "@/lib/utils";
 import { AUTOSAVE_INTERVAL_MS, LOW_TIME_WARNING_SECONDS, SCHOOL_NAME } from "@/lib/constants";
-import type { ExamQuestion, ExamSession, Mock, OptionLetter } from "@/lib/types";
+import type { ExamQuestion, ExamSession, MockForExam, OptionLetter } from "@/lib/types";
 
 export function ExamRoom({
   mock,
   questions,
   session,
 }: {
-  mock: Mock;
+  mock: Pick<MockForExam, "id" | "mock_name">;
   questions: ExamQuestion[];
   session: ExamSession;
 }) {
@@ -143,11 +143,10 @@ export function ExamRoom({
             <p className="mb-6 whitespace-pre-wrap text-base text-foreground">{current.question_text}</p>
 
             {current.image_url && (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element -- arbitrary teacher-supplied URL, not a whitelistable domain
+              <img
                 src={current.image_url}
                 alt="Question diagram"
-                width={600}
-                height={400}
                 className="mb-6 max-w-full rounded-lg border border-border"
               />
             )}
@@ -214,7 +213,7 @@ export function ExamRoom({
                 const isCurrent = q.question_number === current.question_number;
                 return (
                   <button
-                    key={q.id}
+                    key={q.question_number}
                     type="button"
                     onClick={() => store.goTo(q.question_number)}
                     className={cn(

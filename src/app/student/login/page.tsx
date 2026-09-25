@@ -5,8 +5,9 @@ import { useActionState } from "react";
 import { studentLogin, type AuthActionState } from "@/lib/actions/auth";
 import { BrandHeader } from "@/components/shared/brand-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
+import { Input, Label, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BATCHES } from "@/lib/constants";
 
 const initialState: AuthActionState = {};
 
@@ -19,18 +20,33 @@ export default function StudentLoginPage() {
 
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Student Login</CardTitle>
-          <CardDescription>Sign in with your RISE/ACCA Student ID.</CardDescription>
+          <CardTitle>Student Sign In</CardTitle>
+          <CardDescription>
+            Enter your name, RISE/ACCA Student ID, and batch — no password needed.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="acca_id">RISE/ACCA Student ID</Label>
-              <Input id="acca_id" name="acca_id" placeholder="RISE-2026-0001" required autoFocus />
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input id="full_name" name="full_name" placeholder="Jane Student" required autoFocus />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
+              <Label htmlFor="acca_id">RISE/ACCA Student ID</Label>
+              <Input id="acca_id" name="acca_id" placeholder="RISE-2026-0001" required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="batch">Batch</Label>
+              <Select id="batch" name="batch" required defaultValue="">
+                <option value="" disabled>
+                  Select your batch
+                </option>
+                {BATCHES.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </Select>
             </div>
 
             {state.error && (
@@ -38,15 +54,12 @@ export default function StudentLoginPage() {
             )}
 
             <Button type="submit" disabled={pending} className="mt-2">
-              {pending ? "Signing in…" : "Sign In"}
+              {pending ? "Signing in…" : "Continue"}
             </Button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            New here?{" "}
-            <Link href="/student/register" className="font-medium text-brand hover:underline">
-              Create an account
-            </Link>
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Use the same Student ID every time so your results are tracked correctly.
           </p>
         </CardContent>
       </Card>

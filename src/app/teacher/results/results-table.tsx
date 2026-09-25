@@ -172,7 +172,7 @@ export function ResultsTable({ results, mocks }: { results: ExamResult[]; mocks:
                 const mock = mockById.get(r.mock_id);
                 const pass = mock ? percentOf(r.marks_obtained, r.total_marks) >= mock.pass_percentage : true;
                 return (
-                  <tr key={r.id} className="border-b border-border last:border-0">
+                  <tr key={`${r.mock_id}:${r.acca_id}`} className="border-b border-border last:border-0">
                     <td className="px-5 py-3 font-medium text-foreground">{r.student_name}</td>
                     <td className="px-5 py-3 text-muted-foreground">{r.acca_id}</td>
                     <td className="px-5 py-3">{r.batch}</td>

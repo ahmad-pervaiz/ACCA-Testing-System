@@ -3,12 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, XCircle, MinusCircle, Trophy, Clock, Target } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import * as sheets from "@/lib/sheets";
 import { PortalShell } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDuration, cn } from "@/lib/utils";
-import type { Question, OptionLetter } from "@/lib/types";
+import type { OptionLetter } from "@/lib/types";
 
 export default async function ExamResultPage({
   params,
@@ -17,27 +17,17 @@ export default async function ExamResultPage({
 }) {
   const { mockId } = await params;
   const user = await requireUser("student");
-  const admin = createAdminClient();
+  if (user.role !== "student") return null;
 
-  const { data: mock } = await admin.from("mocks").select("*").eq("id", mockId).single();
-  if (!mock) notFound();
-
-  const { data: result } = await admin
-    .from("exam_results")
-    .select("*")
-    .eq("mock_id", mockId)
-    .eq("student_id", user.id)
-    .maybeSingle();
+  const result = await sheets.getResult(mockId, user.acca_id);
   if (!result) redirect(`/exam/${mockId}`);
 
-  const { data: questions } = await admin
-    .from("questions")
-    .select("*")
-    .eq("mock_id", mockId)
-    .order("question_number", { ascending: true });
+  const mock = await sheets.getMockForReview(mockId, user.acca_id).catch(() => null);
+  if (!mock) notFound();
 
-  const responses = result.student_responses as Record<string, OptionLetter>;
-  const pass = result.percentage >= mock.pass_percentage;
+  const responses = result.student_responses;
+  const passPercentage = mock.pass_percentage;
+  const pass = result.percentage >= passPercentage;
 
   return (
     <PortalShell
@@ -57,7 +47,7 @@ export default async function ExamResultPage({
               <p className="text-lg font-medium text-muted-foreground">{result.percentage}%</p>
             </div>
             <Badge variant={pass ? "success" : "danger"} className="px-4 py-1 text-sm">
-              {pass ? "PASS" : "FAIL"} &middot; Pass mark {mock.pass_percentage}%
+              {pass ? "PASS" : "FAIL"} &middot; Pass mark {passPercentage}%
             </Badge>
 
             <div className="mt-2 grid w-full grid-cols-3 gap-3 border-t border-border pt-4">
@@ -79,11 +69,11 @@ export default async function ExamResultPage({
         <div>
           <h2 className="mb-3 text-lg font-semibold text-foreground">Itemized Review</h2>
           <div className="flex flex-col gap-3">
-            {(questions ?? []).map((q: Question) => {
+            {mock.questions.map((q) => {
               const given = responses[String(q.question_number)] ?? null;
               const isCorrect = given === q.correct_option;
               return (
-                <Card key={q.id} className={cn(given === null && "opacity-90")}>
+                <Card key={q.question_number} className={cn(given === null && "opacity-90")}>
                   <CardContent className="flex flex-col gap-3 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-medium text-foreground">

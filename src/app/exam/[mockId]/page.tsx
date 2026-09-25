@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import { AlertTriangle, Clock, FileQuestion, Award } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import * as sheets from "@/lib/sheets";
 import { beginExam } from "@/lib/actions/exam";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,33 +16,16 @@ export default async function PreExamPage({
 }) {
   const { mockId } = await params;
   const user = await requireUser("student");
-  const admin = createAdminClient();
+  if (user.role !== "student") return null;
 
-  const { data: mock } = await admin.from("mocks").select("*").eq("id", mockId).single();
+  const mock = await sheets.getMockMeta(mockId).catch(() => null);
   if (!mock || mock.status !== "published") notFound();
+  if (!mock.batches.includes(user.batch)) redirect("/student/dashboard");
 
-  const { data: batchRow } = await admin
-    .from("mock_batches")
-    .select("batch")
-    .eq("mock_id", mockId)
-    .eq("batch", user.batch ?? "")
-    .maybeSingle();
-  if (!batchRow) redirect("/student/dashboard");
-
-  const { data: existingResult } = await admin
-    .from("exam_results")
-    .select("id")
-    .eq("mock_id", mockId)
-    .eq("student_id", user.id)
-    .maybeSingle();
+  const existingResult = await sheets.getResult(mockId, user.acca_id);
   if (existingResult) redirect(`/exam/${mockId}/result`);
 
-  const { data: existingSession } = await admin
-    .from("exam_sessions")
-    .select("id")
-    .eq("mock_id", mockId)
-    .eq("student_id", user.id)
-    .maybeSingle();
+  const existingSession = await sheets.getSession(mockId, user.acca_id);
 
   const beginExamWithId = beginExam.bind(null, mockId);
 

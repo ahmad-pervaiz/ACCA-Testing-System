@@ -1,26 +1,12 @@
 import type { NextConfig } from "next";
 
-function supabaseHostname(): string | null {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
-  } catch {
-    return null;
-  }
-}
-
-const supabaseHost = supabaseHostname();
-
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: supabaseHost
-      ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }]
-      : [],
-  },
-  // PDF mock papers are uploaded straight through a Server Action — the
-  // 1 MB default body limit would reject anything but a tiny scan.
+  // Mock JSON is pasted/uploaded straight through a Server Action. A large
+  // question bank with long explanations can add up — keep some headroom
+  // above the 1 MB default.
   experimental: {
     serverActions: {
-      bodySizeLimit: "25mb",
+      bodySizeLimit: "5mb",
     },
   },
 };

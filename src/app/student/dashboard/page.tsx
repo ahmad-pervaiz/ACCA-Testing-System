@@ -1,43 +1,25 @@
 import Link from "next/link";
 import { ClipboardList, CheckCircle2, Clock } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import * as sheets from "@/lib/sheets";
 import { PortalShell } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, percentOf } from "@/lib/utils";
-import type { Mock, ExamResult } from "@/lib/types";
 
 export default async function StudentDashboardPage() {
   const user = await requireUser("student");
-  const supabase = await createClient();
+  if (user.role !== "student") return null;
 
-  const { data: batchMockIds } = await supabase
-    .from("mock_batches")
-    .select("mock_id")
-    .eq("batch", user.batch ?? "");
+  const [mocks, results] = await Promise.all([
+    sheets.listMocksForBatch(user.batch),
+    sheets.listResultsForStudent(user.acca_id),
+  ]);
 
-  const mockIds = (batchMockIds ?? []).map((r) => r.mock_id);
-
-  const { data: mocks } = mockIds.length
-    ? await supabase
-        .from("mocks")
-        .select("*")
-        .eq("status", "published")
-        .in("id", mockIds)
-        .order("created_at", { ascending: false })
-    : { data: [] as Mock[] };
-
-  const { data: results } = await supabase
-    .from("exam_results")
-    .select("*")
-    .eq("student_id", user.id)
-    .order("submission_time", { ascending: false });
-
-  const resultsByMock = new Map((results ?? []).map((r) => [r.mock_id, r as ExamResult]));
-  const available = (mocks ?? []).filter((m) => !resultsByMock.has(m.id));
-  const completed = (mocks ?? []).filter((m) => resultsByMock.has(m.id));
+  const resultsByMock = new Map(results.map((r) => [r.mock_id, r]));
+  const available = mocks.filter((m) => !resultsByMock.has(m.id));
+  const completed = mocks.filter((m) => resultsByMock.has(m.id));
 
   return (
     <PortalShell
@@ -63,7 +45,7 @@ export default async function StudentDashboardPage() {
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {available.map((mock: Mock) => (
+              {available.map((mock) => (
                 <Card key={mock.id}>
                   <CardHeader>
                     <Badge variant="brand" className="w-fit">
@@ -111,7 +93,7 @@ export default async function StudentDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {completed.map((mock: Mock) => {
+                    {completed.map((mock) => {
                       const r = resultsByMock.get(mock.id)!;
                       const pass = percentOf(r.marks_obtained, r.total_marks) >= mock.pass_percentage;
                       return (

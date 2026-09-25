@@ -36,14 +36,9 @@ export default function Home() {
               Take assigned mock exams and review your results.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-3">
-            <Link href="/student/login" className="flex-1">
-              <Button className="w-full">Student Login</Button>
-            </Link>
-            <Link href="/student/register" className="flex-1">
-              <Button variant="outline" className="w-full">
-                Register
-              </Button>
+          <CardContent>
+            <Link href="/student/login">
+              <Button className="w-full">Student Sign In</Button>
             </Link>
           </CardContent>
         </Card>
@@ -55,7 +50,7 @@ export default function Home() {
             </div>
             <CardTitle>Teacher / Admin Portal</CardTitle>
             <CardDescription>
-              Upload mock papers and view centralized results.
+              Create mock exams and view centralized results.
             </CardDescription>
           </CardHeader>
           <CardContent>

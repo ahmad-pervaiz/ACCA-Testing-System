@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { saveMockDraft, publishMock } from "@/lib/actions/mocks";
 import { BATCHES } from "@/lib/constants";
-import type { Mock, QuestionDraft, OptionLetter } from "@/lib/types";
+import type { Mock, Question, OptionLetter } from "@/lib/types";
 
 export function ReviewEditor({
   mock,
@@ -18,7 +18,7 @@ export function ReviewEditor({
   initialBatches,
 }: {
   mock: Mock;
-  initialQuestions: QuestionDraft[];
+  initialQuestions: Question[];
   initialBatches: string[];
 }) {
   const router = useRouter();
@@ -27,14 +27,14 @@ export function ReviewEditor({
   const [timeLimit, setTimeLimit] = useState(mock.time_limit_minutes);
   const [passPct, setPassPct] = useState(mock.pass_percentage);
   const [batches, setBatches] = useState<string[]>(initialBatches);
-  const [questions, setQuestions] = useState<QuestionDraft[]>(initialQuestions);
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
   const [expanded, setExpanded] = useState<number | null>(0);
   const [saving, startSaving] = useTransition();
   const [publishing, startPublishing] = useTransition();
 
   const totalMarks = useMemo(() => questions.reduce((s, q) => s + (q.marks || 0), 0), [questions]);
 
-  function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
+  function updateQuestion(index: number, patch: Partial<Question>) {
     setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
   }
 
@@ -178,7 +178,7 @@ export function ReviewEditor({
 
         {questions.map((q, index) => (
           <QuestionCard
-            key={q.id ?? `new-${index}`}
+            key={index}
             question={q}
             index={index}
             expanded={expanded === index}
@@ -210,11 +210,11 @@ function QuestionCard({
   onChange,
   onRemove,
 }: {
-  question: QuestionDraft;
+  question: Question;
   index: number;
   expanded: boolean;
   onToggle: () => void;
-  onChange: (patch: Partial<QuestionDraft>) => void;
+  onChange: (patch: Partial<Question>) => void;
   onRemove: () => void;
 }) {
   return (
@@ -265,7 +265,7 @@ function QuestionCard({
                 <Input
                   value={question[`option_${letter.toLowerCase()}` as "option_a"]}
                   onChange={(e) =>
-                    onChange({ [`option_${letter.toLowerCase()}`]: e.target.value } as Partial<QuestionDraft>)
+                    onChange({ [`option_${letter.toLowerCase()}`]: e.target.value } as Partial<Question>)
                   }
                 />
               </div>
