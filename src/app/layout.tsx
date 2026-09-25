@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { SCHOOL_NAME } from "@/lib/constants";
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   description: `Computer-based ACCA mock testing platform for ${SCHOOL_NAME}.`,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"

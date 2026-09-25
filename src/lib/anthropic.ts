@@ -1,7 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { ExtractedMock } from "@/lib/types";
 
 const client = new Anthropic();
@@ -28,6 +27,52 @@ const ExtractedMockSchema = z.object({
   questions: z.array(ExtractedQuestionSchema),
 });
 
+const EXTRACT_TOOL_NAME = "record_extracted_mock";
+
+// Forced tool-call is used instead of `output_config.format` for structured
+// output — it's the widely-supported path across SDK versions and models,
+// and the result is validated against ExtractedMockSchema below regardless.
+const EXTRACT_TOOL: Anthropic.Tool = {
+  name: EXTRACT_TOOL_NAME,
+  description: "Records the fully extracted mock exam questions.",
+  input_schema: {
+    type: "object",
+    properties: {
+      suggested_mock_name: { type: "string", description: 'e.g. "FA1 Mock 01"' },
+      suggested_subject: { type: "string", description: 'e.g. "FA1"' },
+      questions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            question_number: { type: "integer", minimum: 1 },
+            question_text: { type: "string" },
+            option_a: { type: "string" },
+            option_b: { type: "string" },
+            option_c: { type: "string" },
+            option_d: { type: "string" },
+            correct_option: { type: "string", enum: ["A", "B", "C", "D"] },
+            explanation: { type: "string" },
+            marks: { type: "integer", minimum: 1 },
+          },
+          required: [
+            "question_number",
+            "question_text",
+            "option_a",
+            "option_b",
+            "option_c",
+            "option_d",
+            "correct_option",
+            "explanation",
+            "marks",
+          ],
+        },
+      },
+    },
+    required: ["suggested_mock_name", "suggested_subject", "questions"],
+  },
+};
+
 const EXTRACTION_PROMPT = `You are converting a scanned/typed ACCA mock exam PDF into structured multiple-choice questions for a computer-based testing system.
 
 Read the entire document and extract every multiple-choice question you find. For each question:
@@ -40,14 +85,18 @@ Read the entire document and extract every multiple-choice question you find. Fo
 
 Also suggest a mock_name (e.g. "FA1 Mock 01") and subject code (e.g. "FA1") based on the paper's title/header if present, otherwise infer from content.
 
-Extract ALL questions in the document — do not stop early or summarize. If the document has 50 questions, return 50 entries.`;
+Extract ALL questions in the document — do not stop early or summarize. If the document has 50 questions, return 50 entries.
+
+Call ${EXTRACT_TOOL_NAME} exactly once with the complete result.`;
 
 export async function extractMockFromPdf(
   pdfBase64: string,
 ): Promise<ExtractedMock> {
-  const response = await client.messages.parse({
+  const stream = client.messages.stream({
     model: MODEL,
     max_tokens: 32000,
+    tools: [EXTRACT_TOOL],
+    tool_choice: { type: "tool", name: EXTRACT_TOOL_NAME },
     messages: [
       {
         role: "user",
@@ -64,16 +113,26 @@ export async function extractMockFromPdf(
         ],
       },
     ],
-    output_config: {
-      format: zodOutputFormat(ExtractedMockSchema),
-    },
   });
 
-  if (!response.parsed_output) {
+  const response = await stream.finalMessage();
+
+  const toolUse = response.content.find(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
+  );
+
+  if (!toolUse) {
     throw new Error(
-      "Claude could not extract structured questions from this PDF. Try a clearer scan, or add/correct questions manually after upload.",
+      "Claude did not return structured questions for this PDF. Try a clearer scan, or add/correct questions manually after upload.",
     );
   }
 
-  return response.parsed_output;
+  const parsed = ExtractedMockSchema.safeParse(toolUse.input);
+  if (!parsed.success) {
+    throw new Error(
+      `Claude's extraction did not match the expected format: ${parsed.error.message}`,
+    );
+  }
+
+  return parsed.data;
 }
