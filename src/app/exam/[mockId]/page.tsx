@@ -18,7 +18,7 @@ export default async function PreExamPage({
   const user = await requireUser("student");
   if (user.role !== "student") return null;
 
-  const mock = await sheets.getMockMeta(mockId).catch(() => null);
+  const mock = await sheets.orNull(sheets.getMockMeta(mockId), "Mock not found.");
   if (!mock || mock.status !== "published") notFound();
   if (!mock.batches.includes(user.batch)) redirect("/student/dashboard");
 

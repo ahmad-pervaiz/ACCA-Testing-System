@@ -18,7 +18,7 @@ export default async function ReviewMockPage({
   const { mockId } = await params;
   const user = await requireUser("teacher");
 
-  const mock = await sheets.getMockForEdit(mockId).catch(() => null);
+  const mock = await sheets.orNull(sheets.getMockForEdit(mockId), "Mock not found.");
   if (!mock) notFound();
 
   return (

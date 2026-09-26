@@ -20,7 +20,7 @@ export default async function TakeExamPage({
 
   // Answer key is deliberately never fetched here — getMockForExam strips
   // correct_option/explanation server-side in Code.gs before this ever runs.
-  const mock = await sheets.getMockForExam(mockId).catch(() => null);
+  const mock = await sheets.orNull(sheets.getMockForExam(mockId), "Mock not found.");
   if (!mock) notFound();
 
   return <ExamRoom mock={mock} questions={mock.questions} session={session} />;

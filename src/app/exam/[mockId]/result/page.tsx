@@ -22,7 +22,11 @@ export default async function ExamResultPage({
   const result = await sheets.getResult(mockId, user.acca_id);
   if (!result) redirect(`/exam/${mockId}`);
 
-  const mock = await sheets.getMockForReview(mockId, user.acca_id).catch(() => null);
+  const mock = await sheets.orNull(
+    sheets.getMockForReview(mockId, user.acca_id),
+    "Mock not found.",
+    "No submitted result found for this mock and student.",
+  );
   if (!mock) notFound();
 
   const responses = result.student_responses;

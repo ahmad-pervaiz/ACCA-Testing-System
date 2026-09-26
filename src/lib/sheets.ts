@@ -118,6 +118,23 @@ async function scriptPost<T>(action: string, payload: Record<string, unknown> = 
   return json.data as T;
 }
 
+/**
+ * Turns a specific, expected "not found"-style error from Code.gs into
+ * `null` so a caller can render a real notFound()/redirect — while letting
+ * any other error (a network blip reaching Apps Script, say) propagate so
+ * it surfaces as a real error instead of a misleading 404. Do not reach for
+ * a bare `.catch(() => null)` on a sheets.ts call; it hides genuine
+ * failures behind the wrong page.
+ */
+export async function orNull<T>(promise: Promise<T>, ...expectedMessages: string[]): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (err) {
+    if (err instanceof Error && expectedMessages.includes(err.message)) return null;
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Students (real accounts — email + password; RISE has no institutional
 // email to derive a login from, so students register with their own)
