@@ -75,8 +75,12 @@ npm run dev
 
 - Faculty: `/teacher/login` with `alipervaiz.ca269@gmail.com` (or whatever
   you set `NEXT_PUBLIC_TEACHER_EMAIL` to) + `TEACHER_PASSWORD`
-- Students: `/student/register` once (Name, email, RISE/ACCA ID, batch,
-  password), then `/student/login` with RISE/ACCA ID + password
+- Students: `/student/register` once (Name, email, Student ID, batch,
+  password), then `/student/login` with **email** + password. Students
+  outside RISE (no RISE ID) can register too — pick "External /
+  Self-Study" as the batch and make up any Student ID. Forgot password?
+  `/student/forgot-password` emails a reset link via `MailApp` (free —
+  sends through the deploying Google account's own Gmail).
 
 > If your project directory lives on an NTFS/exFAT mount, `node_modules`
 > there is extremely slow. Symlink it to a native-filesystem location
@@ -85,18 +89,23 @@ npm run dev
 ## The trade-off, stated plainly
 
 Students **are** authenticated — registration collects Name, a personal
-email (RISE issues no institutional one), RISE/ACCA ID, batch, and a
-password; login checks RISE/ACCA ID + password against a salted hash
-stored in the `Students` sheet (`google-apps-script/Code.gs` ->
-`hashPassword_`). The one real trade-off: Apps Script has no bcrypt/argon2
-library, so the hash is salted SHA-256 — far better than plaintext, but
-weaker than a proper password-hashing algorithm if the underlying Sheet
-were ever exposed. For a school's practice-mock tool this is a reasonable
-line to draw for a zero-infrastructure backend; it's not what you'd want
-for anything holding real financial or personal data. Duplicate exam
-attempts are still blocked (one result per mock+RISE ID, enforced in
-`Code.gs`), and the teacher's own account is a separate, server-only
-password check.
+email, a Student ID, batch, and a password; login checks **email** +
+password against a salted hash stored in the `Students` sheet
+(`google-apps-script/Code.gs` -> `hashPassword_`). Login is by email
+rather than the Student ID specifically so students with no RISE ID can
+still register and sit mocks. The one real trade-off: Apps Script has no
+bcrypt/argon2 library, so the hash is salted SHA-256 — far better than
+plaintext, but weaker than a proper password-hashing algorithm if the
+underlying Sheet were ever exposed. For a school's practice-mock tool this
+is a reasonable line to draw for a zero-infrastructure backend; it's not
+what you'd want for anything holding real financial or personal data.
+Duplicate exam attempts are still blocked (one result per mock+Student ID,
+enforced in `Code.gs`), and the teacher's own account is a separate,
+server-only password check.
+
+Password reset never reveals whether an email is registered — asking for
+a reset always responds the same way whether or not that address has an
+account (`requestPasswordReset_` in `Code.gs`).
 
 ## Creating a mock (teacher)
 
