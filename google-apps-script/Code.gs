@@ -31,6 +31,10 @@
  *      "Manage deployments" -> edit -> new version) for changes to go live.
  */
 
+// Bump this string whenever you need to prove a redeploy actually took —
+// call ?action=ping and compare against what this file says right now.
+const SCRIPT_VERSION = "2026-09-26-header-selfheal-1";
+
 const SHEET_MOCKS = "Mocks";
 const SHEET_RESULTS = "Results";
 const SHEET_SESSIONS = "Sessions";
@@ -123,6 +127,10 @@ function doGet(e) {
       case "debugSheet":
         requireTeacher_(e.parameter.teacherToken);
         return debugSheet_(e.parameter.name);
+      case "ping":
+        // No auth needed — pure "is the latest deployment actually live"
+        // check. Bump SCRIPT_VERSION any time you need to re-verify this.
+        return { version: SCRIPT_VERSION, now: new Date().toISOString() };
       default:
         throw new Error("Unknown action: " + action);
     }
@@ -249,8 +257,7 @@ function findRow_(sheet, predicate) {
  * any sheet by name, so a header mismatch or wrong-tab issue is visible
  * without needing screenshots. Teacher-token gated; safe to leave in. */
 function debugSheet_(name) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-  if (!sheet) {
+  if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name)) {
     return {
       error: "No sheet named \"" + name + "\"",
       allSheetNames: SpreadsheetApp.getActiveSpreadsheet().getSheets().map(function (s) {
@@ -258,6 +265,10 @@ function debugSheet_(name) {
       }),
     };
   }
+  // Goes through sheet_() deliberately — this is what every real action
+  // uses, so this debug view reflects reality (including the self-healing
+  // header repair) instead of reading the raw sheet directly.
+  const sheet = sheet_(name);
   const values = sheet.getDataRange().getValues();
   return {
     sheetName: sheet.getName(),
