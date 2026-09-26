@@ -38,19 +38,23 @@ function scriptUrl(): string {
 }
 
 /**
- * Apps Script's /exec URL responds with a 302 to a googleusercontent.com
- * execution URL. The WHATWG fetch spec downgrades POST to GET on a 301/302/
- * 303 redirect, which would silently drop the JSON body — so redirects are
- * followed manually here, preserving method and body.
+ * Apps Script's /exec URL runs the script (doGet/doPost) against the request
+ * exactly once, then responds with a 302 to a googleusercontent.com "echo"
+ * URL that serves the already-computed result from a signed cache key. That
+ * follow-up fetch must always be a plain GET with no body — POSTing to it
+ * (even to preserve the original method, which is what the WHATWG fetch spec
+ * would otherwise silently downgrade anyway) hits Google Drive's HTTP layer
+ * directly and returns an HTML "Page not found", not the script's response.
+ * Confirmed empirically against a live deployment — don't "fix" this back to
+ * preserving the method without re-testing against a real deployment.
  */
 async function fetchFollowingRedirect(url: string, init: RequestInit): Promise<Response> {
-  let response = await fetch(url, { ...init, redirect: "manual" });
-  let hops = 0;
-  while (response.status >= 300 && response.status < 400 && hops < 5) {
+  const response = await fetch(url, { ...init, redirect: "manual" });
+  if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location");
-    if (!location) break;
-    response = await fetch(location, { ...init, redirect: "manual" });
-    hops += 1;
+    if (location) {
+      return fetch(location, { method: "GET", redirect: "follow" });
+    }
   }
   return response;
 }
