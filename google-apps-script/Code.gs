@@ -84,12 +84,6 @@ function ensureSheet_(ss, name, headers) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
-  // Always (re)write row 1 to match the headers this code expects — every
-  // read keys off this exact header text (readRows_ does row[headers[c]] =
-  // values[i][c]), so a stale or hand-typed header row silently breaks
-  // every lookup while leaving the data rows below untouched and intact.
-  // Only writing headers "if empty" (the previous behavior) let a
-  // pre-existing sheet's header row drift out of sync forever.
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.setFrozenRows(1);
   return sheet;
@@ -197,9 +191,35 @@ function requireTeacher_(token) {
 // Sheet <-> object helpers
 // ---------------------------------------------------------------------------
 
+const EXPECTED_HEADERS_ = {
+  Mocks: MOCKS_HEADERS,
+  Results: RESULTS_HEADERS,
+  Sessions: SESSIONS_HEADERS,
+  Students: STUDENTS_HEADERS,
+};
+
+/**
+ * Self-healing: every action goes through here, so a header row that
+ * doesn't match what this code expects — hand-typed before setup() ever
+ * ran, or left over from an older version of this script — gets corrected
+ * on the very next request. This does NOT depend on anyone remembering to
+ * re-run `setup` after editing/redeploying the script; it happens
+ * automatically on every call. Never touches data rows, only row 1.
+ */
 function sheet_(name) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sheet) throw new Error("Sheet not found: " + name);
+
+  const expected = EXPECTED_HEADERS_[name];
+  if (expected) {
+    const actual = sheet.getRange(1, 1, 1, expected.length).getValues()[0];
+    const matches = expected.every(function (h, i) { return actual[i] === h; });
+    if (!matches) {
+      sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+      sheet.setFrozenRows(1);
+    }
+  }
+
   return sheet;
 }
 
