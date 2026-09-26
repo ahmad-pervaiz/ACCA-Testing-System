@@ -122,6 +122,9 @@ function doGet(e) {
       case "listResultsForTeacher":
         requireTeacher_(e.parameter.teacherToken);
         return listResults_();
+      case "debugSheet":
+        requireTeacher_(e.parameter.teacherToken);
+        return debugSheet_(e.parameter.name);
       default:
         throw new Error("Unknown action: " + action);
     }
@@ -216,6 +219,30 @@ function findRow_(sheet, predicate) {
     if (predicate(rows[i])) return rows[i];
   }
   return null;
+}
+
+/** Temporary diagnostic — raw header row + row count + first data row for
+ * any sheet by name, so a header mismatch or wrong-tab issue is visible
+ * without needing screenshots. Teacher-token gated; safe to leave in. */
+function debugSheet_(name) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sheet) {
+    return {
+      error: "No sheet named \"" + name + "\"",
+      allSheetNames: SpreadsheetApp.getActiveSpreadsheet().getSheets().map(function (s) {
+        return s.getName();
+      }),
+    };
+  }
+  const values = sheet.getDataRange().getValues();
+  return {
+    sheetName: sheet.getName(),
+    lastRow: sheet.getLastRow(),
+    lastColumn: sheet.getLastColumn(),
+    headerRow: values[0] || [],
+    firstDataRow: values[1] || null,
+    totalRowsIncludingHeader: values.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
