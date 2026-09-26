@@ -22,8 +22,9 @@ export default function StudentRegisterPage() {
         <CardHeader>
           <CardTitle>Create Student Account</CardTitle>
           <CardDescription>
-            RISE doesn&apos;t issue a school email, so use any email you check
-            regularly — it&apos;s only used to recover your account.
+            You&apos;ll sign in with your email and password. Not a RISE student?
+            You&apos;re still welcome — just make up any Student ID and pick
+            &quot;External / Self-Study&quot; as your batch.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -37,7 +38,7 @@ export default function StudentRegisterPage() {
               <Input id="email" name="email" type="email" placeholder="jane@gmail.com" required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="acca_id">RISE/ACCA ID</Label>
+              <Label htmlFor="acca_id">Student ID</Label>
               <Input id="acca_id" name="acca_id" placeholder="RISE-2026-0001" required />
             </div>
             <div className="flex flex-col gap-1.5">

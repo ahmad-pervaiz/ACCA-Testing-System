@@ -31,6 +31,7 @@ export const BATCHES = [
   "Morning Batch",
   "Evening Batch",
   "Weekend Batch",
+  "External / Self-Study",
 ] as const;
 
 export const DEFAULT_TIME_LIMIT_MINUTES = 120;

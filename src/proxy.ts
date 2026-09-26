@@ -9,13 +9,14 @@ import { SESSION_COOKIE_NAME } from "@/lib/constants";
  *   /exam/**     -> requires a signed-in student
  * Unauthenticated or wrong-role visitors are redirected to the right login.
  */
+const PUBLIC_STUDENT_PATHS = ["/student/login", "/student/register", "/student/forgot-password", "/student/reset-password"];
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isTeacherRoute = pathname.startsWith("/teacher") && !pathname.startsWith("/teacher/login");
   const isStudentRoute =
     (pathname.startsWith("/student") &&
-      !pathname.startsWith("/student/login") &&
-      !pathname.startsWith("/student/register")) ||
+      !PUBLIC_STUDENT_PATHS.some((p) => pathname.startsWith(p))) ||
     pathname.startsWith("/exam");
 
   if (!isTeacherRoute && !isStudentRoute) {

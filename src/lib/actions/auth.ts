@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { signSession, verifySession } from "@/lib/session";
 import * as sheets from "@/lib/sheets";
 import {
@@ -55,11 +55,20 @@ export async function teacherLogin(
   redirect("/teacher/dashboard");
 }
 
+/** Derives this request's own origin (works on localhost and behind Vercel's proxy) so password-reset emails link back to wherever the app actually is. */
+async function appUrl(): Promise<string> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") || "http";
+  const host = h.get("x-forwarded-host") || h.get("host");
+  return `${proto}://${host}`;
+}
+
 /**
  * Real student accounts, stored in the Students sheet (RISE/ACCA ID, email,
  * batch, salted password hash) — see google-apps-script/Code.gs. Students
- * register with any personal email since RISE issues no institutional one,
- * then log in with their RISE/ACCA ID + password.
+ * register with any personal email since RISE issues no institutional one
+ * (this also means students from outside RISE, with no RISE ID, can
+ * register and sit mocks), then log in with email + password.
  */
 export async function studentRegister(
   _prev: AuthActionState,
@@ -99,21 +108,64 @@ export async function studentLogin(
   _prev: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
-  const accaId = String(formData.get("acca_id") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
-  if (!accaId || !password) {
-    return { error: "Enter your RISE/ACCA ID and password." };
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
   }
 
   try {
-    const account = await sheets.studentLoginCheck({ accaId, password });
+    const account = await sheets.studentLoginCheck({ email, password });
     await setSessionCookie(signSession({ role: "student", ...account }));
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Invalid RISE/ACCA ID or password." };
+    return { error: err instanceof Error ? err.message : "Invalid email or password." };
   }
 
   redirect("/student/dashboard");
+}
+
+export interface ForgotPasswordState {
+  error?: string;
+  sent?: boolean;
+}
+
+export async function forgotPassword(
+  _prev: ForgotPasswordState,
+  formData: FormData,
+): Promise<ForgotPasswordState> {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  if (!email) return { error: "Enter your email address." };
+
+  try {
+    await sheets.requestPasswordReset({ email, appUrl: await appUrl() });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not send reset email." };
+  }
+
+  // Always "sent" — Code.gs never reveals whether the email is registered.
+  return { sent: true };
+}
+
+export async function resetPassword(
+  _prev: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const token = String(formData.get("token") || "").trim();
+  const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirm_password") || "");
+
+  if (!token) return { error: "Missing or invalid reset link." };
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  if (password !== confirmPassword) return { error: "Passwords do not match." };
+
+  try {
+    await sheets.resetPassword({ token, password });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not reset password." };
+  }
+
+  redirect("/student/login");
 }
 
 export async function logout(): Promise<void> {

@@ -8,10 +8,10 @@
  *     never trusts a score sent by the browser
  *   - every write that a teacher makes requires TEACHER_TOKEN; every write a
  *     student makes is scoped to their own mockId+accaId
- *   - students are real accounts: RISE/ACCA ID + email + salted-SHA-256
- *     password hash in the Students sheet (RISE has no institutional email
- *     to derive a login from the way the paid version did, so students
- *     register with any email of their own — see registerStudent_)
+ *   - students are real accounts: email + salted-SHA-256 password hash in
+ *     the Students sheet, logging in by email (not a RISE ID) so students
+ *     from outside RISE can register and sit mocks too — see
+ *     registerStudent_ / studentLogin_ / requestPasswordReset_
  *
  * SETUP (one time):
  *   1. Create a new Google Sheet. Extensions -> Apps Script.
@@ -33,7 +33,7 @@
 
 // Bump this string whenever you need to prove a redeploy actually took —
 // call ?action=ping and compare against what this file says right now.
-const SCRIPT_VERSION = "2026-09-26-header-selfheal-1";
+const SCRIPT_VERSION = "2026-09-26-email-login-reset-1";
 
 const SHEET_MOCKS = "Mocks";
 const SHEET_RESULTS = "Results";
@@ -59,7 +59,10 @@ const SESSIONS_HEADERS = [
 
 const STUDENTS_HEADERS = [
   "AccaId", "FullName", "Email", "Batch", "PasswordHash", "PasswordSalt", "CreatedAt",
+  "ResetToken", "ResetTokenExpiresAt",
 ];
+
+const PASSWORD_RESET_VALID_MINUTES = 60;
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -157,6 +160,10 @@ function doPost(e) {
         return registerStudent_(body);
       case "studentLogin":
         return studentLogin_(body);
+      case "requestPasswordReset":
+        return requestPasswordReset_(body);
+      case "resetPassword":
+        return resetPassword_(body);
       case "beginExam":
         return beginExam_(body);
       case "saveProgress":
@@ -281,8 +288,9 @@ function debugSheet_(name) {
 }
 
 // ---------------------------------------------------------------------------
-// Students (real accounts — email + password, since RISE has no institutional
-// email to derive a login from; students log in with their RISE/ACCA ID)
+// Students (real accounts — email + password. Login is by email (not the
+// RISE/ACCA ID) so students from outside RISE, who have no RISE ID, can
+// register and sit mocks too — they just pick any batch/ID that fits.)
 // ---------------------------------------------------------------------------
 
 /** Salted SHA-256. Not bcrypt/argon2 (Apps Script has no such library), but
@@ -345,17 +353,78 @@ function registerStudent_(body) {
 }
 
 function studentLogin_(body) {
-  const accaId = String(body.accaId || "").trim();
+  const email = String(body.email || "").trim();
   const password = String(body.password || "");
-  if (!accaId || !password) throw new Error("Enter your RISE/ACCA ID and password.");
+  if (!email || !password) throw new Error("Enter your email and password.");
 
-  const row = findStudentByAccaId_(accaId);
-  if (!row) throw new Error("Invalid RISE/ACCA ID or password.");
+  const row = findStudentByEmail_(email);
+  if (!row) throw new Error("Invalid email or password.");
 
   const hash = hashPassword_(password, row.PasswordSalt);
-  if (hash !== row.PasswordHash) throw new Error("Invalid RISE/ACCA ID or password.");
+  if (hash !== row.PasswordHash) throw new Error("Invalid email or password.");
 
   return studentRowToPublic_(row);
+}
+
+/**
+ * Always returns {sent: true} regardless of whether the email is
+ * registered — never reveal which emails exist. If it is registered, mails
+ * a time-limited reset link via MailApp (free: sends through the deploying
+ * Google account's own Gmail, subject to its normal daily sending quota —
+ * plenty for a school). appUrl is passed in per-request from Next.js
+ * (derived from the actual request host) since Code.gs has no way to know
+ * where the app is hosted on its own.
+ */
+function requestPasswordReset_(body) {
+  const email = String(body.email || "").trim();
+  const appUrl = String(body.appUrl || "").trim();
+  if (!email || !appUrl) throw new Error("Missing email or app URL.");
+
+  const row = findStudentByEmail_(email);
+  if (row) {
+    const token = Utilities.getUuid();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_VALID_MINUTES * 60000).toISOString();
+    const sheet = sheet_(SHEET_STUDENTS);
+    sheet.getRange(row._row, STUDENTS_HEADERS.indexOf("ResetToken") + 1, 1, 2).setValues([
+      [token, expiresAt],
+    ]);
+
+    const link = appUrl.replace(/\/+$/, "") + "/student/reset-password?token=" + encodeURIComponent(token);
+    MailApp.sendEmail({
+      to: email,
+      subject: "Reset your password — RISE School of Accountancy",
+      body:
+        "Hi " + row.FullName + ",\n\n" +
+        "Click the link below to set a new password. This link expires in " +
+        PASSWORD_RESET_VALID_MINUTES + " minutes and can only be used once.\n\n" +
+        link + "\n\n" +
+        "If you didn't request this, you can ignore this email.",
+    });
+  }
+
+  return { sent: true };
+}
+
+function resetPassword_(body) {
+  const token = String(body.token || "").trim();
+  const password = String(body.password || "");
+  if (!token || !password) throw new Error("Missing token or password.");
+  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+
+  const row = findRow_(sheet_(SHEET_STUDENTS), function (r) {
+    return r.ResetToken && String(r.ResetToken) === token;
+  });
+  if (!row || !row.ResetTokenExpiresAt || new Date(row.ResetTokenExpiresAt).getTime() < Date.now()) {
+    throw new Error("This reset link is invalid or has expired. Request a new one.");
+  }
+
+  const salt = Utilities.getUuid();
+  const hash = hashPassword_(password, salt);
+  const sheet = sheet_(SHEET_STUDENTS);
+  sheet.getRange(row._row, STUDENTS_HEADERS.indexOf("PasswordHash") + 1, 1, 2).setValues([[hash, salt]]);
+  sheet.getRange(row._row, STUDENTS_HEADERS.indexOf("ResetToken") + 1, 1, 2).setValues([["", ""]]);
+
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------

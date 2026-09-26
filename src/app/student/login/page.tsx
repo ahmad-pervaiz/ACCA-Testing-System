@@ -20,16 +20,21 @@ export default function StudentLoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Student Login</CardTitle>
-          <CardDescription>Sign in with your RISE/ACCA ID and password.</CardDescription>
+          <CardDescription>Sign in with your email and password.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="acca_id">RISE/ACCA ID</Label>
-              <Input id="acca_id" name="acca_id" placeholder="RISE-2026-0001" required autoFocus />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" placeholder="you@gmail.com" required autoFocus />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/student/forgot-password" className="text-xs font-medium text-brand hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Input id="password" name="password" type="password" required />
             </div>
 

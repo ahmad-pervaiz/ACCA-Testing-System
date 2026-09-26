@@ -158,10 +158,25 @@ export function registerStudent(args: {
 }
 
 export function studentLoginCheck(args: {
-  accaId: string;
+  email: string;
   password: string;
 }): Promise<StudentAccount> {
   return scriptPost<StudentAccount>("studentLogin", args);
+}
+
+/** Always resolves — Code.gs never reveals whether an email is registered. */
+export function requestPasswordReset(args: {
+  email: string;
+  appUrl: string;
+}): Promise<{ sent: boolean }> {
+  return scriptPost<{ sent: boolean }>("requestPasswordReset", args);
+}
+
+export function resetPassword(args: {
+  token: string;
+  password: string;
+}): Promise<{ ok: boolean }> {
+  return scriptPost<{ ok: boolean }>("resetPassword", args);
 }
 
 // ---------------------------------------------------------------------------
