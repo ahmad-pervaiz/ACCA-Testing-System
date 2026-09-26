@@ -13,7 +13,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isTeacherRoute = pathname.startsWith("/teacher") && !pathname.startsWith("/teacher/login");
   const isStudentRoute =
-    (pathname.startsWith("/student") && !pathname.startsWith("/student/login")) ||
+    (pathname.startsWith("/student") &&
+      !pathname.startsWith("/student/login") &&
+      !pathname.startsWith("/student/register")) ||
     pathname.startsWith("/exam");
 
   if (!isTeacherRoute && !isStudentRoute) {

@@ -84,6 +84,35 @@ async function scriptPost<T>(action: string, payload: Record<string, unknown> = 
 }
 
 // ---------------------------------------------------------------------------
+// Students (real accounts — email + password; RISE has no institutional
+// email to derive a login from, so students register with their own)
+// ---------------------------------------------------------------------------
+
+export interface StudentAccount {
+  full_name: string;
+  email: string;
+  acca_id: string;
+  batch: string;
+}
+
+export function registerStudent(args: {
+  fullName: string;
+  email: string;
+  accaId: string;
+  batch: string;
+  password: string;
+}): Promise<StudentAccount> {
+  return scriptPost<StudentAccount>("registerStudent", args);
+}
+
+export function studentLoginCheck(args: {
+  accaId: string;
+  password: string;
+}): Promise<StudentAccount> {
+  return scriptPost<StudentAccount>("studentLogin", args);
+}
+
+// ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { signSession, verifySession } from "@/lib/session";
+import * as sheets from "@/lib/sheets";
 import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
@@ -55,23 +56,63 @@ export async function teacherLogin(
 }
 
 /**
- * Students identify with Name + RISE/ACCA Student ID + Batch — no password.
- * There is no student database to check against; the signed cookie is what
- * proxy.ts and every Server Action trust afterwards.
+ * Real student accounts, stored in the Students sheet (RISE/ACCA ID, email,
+ * batch, salted password hash) — see google-apps-script/Code.gs. Students
+ * register with any personal email since RISE issues no institutional one,
+ * then log in with their RISE/ACCA ID + password.
  */
-export async function studentLogin(
+export async function studentRegister(
   _prev: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
   const fullName = String(formData.get("full_name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
   const accaId = String(formData.get("acca_id") || "").trim();
   const batch = String(formData.get("batch") || "").trim();
+  const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirm_password") || "");
 
-  if (!fullName || !accaId || !batch) {
-    return { error: "Enter your name, Student ID, and batch." };
+  if (!fullName || !email || !accaId || !batch || !password) {
+    return { error: "All fields are required." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter a valid email address." };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match." };
   }
 
-  await setSessionCookie(signSession({ role: "student", full_name: fullName, acca_id: accaId, batch }));
+  try {
+    const account = await sheets.registerStudent({ fullName, email, accaId, batch, password });
+    await setSessionCookie(signSession({ role: "student", ...account }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create account." };
+  }
+
+  redirect("/student/dashboard");
+}
+
+export async function studentLogin(
+  _prev: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const accaId = String(formData.get("acca_id") || "").trim();
+  const password = String(formData.get("password") || "");
+
+  if (!accaId || !password) {
+    return { error: "Enter your RISE/ACCA ID and password." };
+  }
+
+  try {
+    const account = await sheets.studentLoginCheck({ accaId, password });
+    await setSessionCookie(signSession({ role: "student", ...account }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Invalid RISE/ACCA ID or password." };
+  }
+
   redirect("/student/dashboard");
 }
 

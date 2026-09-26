@@ -5,7 +5,7 @@ export type OptionLetter = "A" | "B" | "C" | "D";
 /** The signed-cookie session payload — see src/lib/session.ts */
 export type SessionUser =
   | { role: "teacher"; email: string; full_name: string }
-  | { role: "student"; full_name: string; acca_id: string; batch: string };
+  | { role: "student"; full_name: string; email: string; acca_id: string; batch: string };
 
 export interface Mock {
   id: string;

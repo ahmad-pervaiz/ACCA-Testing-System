@@ -36,9 +36,14 @@ export default function Home() {
               Take assigned mock exams and review your results.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href="/student/login">
-              <Button className="w-full">Student Sign In</Button>
+          <CardContent className="flex gap-3">
+            <Link href="/student/login" className="flex-1">
+              <Button className="w-full">Sign In</Button>
+            </Link>
+            <Link href="/student/register" className="flex-1">
+              <Button variant="outline" className="w-full">
+                Register
+              </Button>
             </Link>
           </CardContent>
         </Card>

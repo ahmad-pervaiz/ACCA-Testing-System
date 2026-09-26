@@ -8,6 +8,10 @@
  *     never trusts a score sent by the browser
  *   - every write that a teacher makes requires TEACHER_TOKEN; every write a
  *     student makes is scoped to their own mockId+accaId
+ *   - students are real accounts: RISE/ACCA ID + email + salted-SHA-256
+ *     password hash in the Students sheet (RISE has no institutional email
+ *     to derive a login from the way the paid version did, so students
+ *     register with any email of their own — see registerStudent_)
  *
  * SETUP (one time):
  *   1. Create a new Google Sheet. Extensions -> Apps Script.
@@ -30,6 +34,7 @@
 const SHEET_MOCKS = "Mocks";
 const SHEET_RESULTS = "Results";
 const SHEET_SESSIONS = "Sessions";
+const SHEET_STUDENTS = "Students";
 
 const MOCKS_HEADERS = [
   "MockID", "MockName", "Subject", "TeacherName", "TimeLimitMinutes",
@@ -48,6 +53,10 @@ const SESSIONS_HEADERS = [
   "CurrentQuestion", "ResponsesJSON", "FlaggedJSON", "Submitted",
 ];
 
+const STUDENTS_HEADERS = [
+  "AccaId", "FullName", "Email", "Batch", "PasswordHash", "PasswordSalt", "CreatedAt",
+];
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -57,6 +66,7 @@ function setup() {
   ensureSheet_(ss, SHEET_MOCKS, MOCKS_HEADERS);
   ensureSheet_(ss, SHEET_RESULTS, RESULTS_HEADERS);
   ensureSheet_(ss, SHEET_SESSIONS, SESSIONS_HEADERS);
+  ensureSheet_(ss, SHEET_STUDENTS, STUDENTS_HEADERS);
 
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty("TEACHER_TOKEN")) {
@@ -134,6 +144,10 @@ function doPost(e) {
       case "archiveMock":
         requireTeacher_(body.teacherToken);
         return setMockStatus_(body.id, "archived");
+      case "registerStudent":
+        return registerStudent_(body);
+      case "studentLogin":
+        return studentLogin_(body);
       case "beginExam":
         return beginExam_(body);
       case "saveProgress":
@@ -202,6 +216,84 @@ function findRow_(sheet, predicate) {
     if (predicate(rows[i])) return rows[i];
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Students (real accounts — email + password, since RISE has no institutional
+// email to derive a login from; students log in with their RISE/ACCA ID)
+// ---------------------------------------------------------------------------
+
+/** Salted SHA-256. Not bcrypt/argon2 (Apps Script has no such library), but
+ * far better than storing plaintext — a reasonable trade-off for a free,
+ * zero-infrastructure backend. Document this if you audit the sheet. */
+function hashPassword_(password, salt) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password + ":" + salt);
+  return bytes
+    .map(function (b) {
+      const unsigned = (b + 256) % 256;
+      const hex = unsigned.toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    })
+    .join("");
+}
+
+function findStudentByAccaId_(accaId) {
+  return findRow_(sheet_(SHEET_STUDENTS), function (r) {
+    return String(r.AccaId).toLowerCase() === String(accaId).toLowerCase();
+  });
+}
+
+function findStudentByEmail_(email) {
+  return findRow_(sheet_(SHEET_STUDENTS), function (r) {
+    return String(r.Email).toLowerCase() === String(email).toLowerCase();
+  });
+}
+
+function studentRowToPublic_(row) {
+  return { full_name: row.FullName, email: row.Email, acca_id: row.AccaId, batch: row.Batch };
+}
+
+function registerStudent_(body) {
+  const accaId = String(body.accaId || "").trim();
+  const email = String(body.email || "").trim();
+  const fullName = String(body.fullName || "").trim();
+  const batch = String(body.batch || "").trim();
+  const password = String(body.password || "");
+
+  if (!accaId || !email || !fullName || !batch || !password) {
+    throw new Error("All fields are required.");
+  }
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+  if (findStudentByAccaId_(accaId)) {
+    throw new Error("An account with this RISE/ACCA ID already exists.");
+  }
+  if (findStudentByEmail_(email)) {
+    throw new Error("An account with this email already exists.");
+  }
+
+  const salt = Utilities.getUuid();
+  const hash = hashPassword_(password, salt);
+  sheet_(SHEET_STUDENTS).appendRow([
+    accaId, fullName, email, batch, hash, salt, new Date().toISOString(),
+  ]);
+
+  return studentRowToPublic_({ AccaId: accaId, FullName: fullName, Email: email, Batch: batch });
+}
+
+function studentLogin_(body) {
+  const accaId = String(body.accaId || "").trim();
+  const password = String(body.password || "");
+  if (!accaId || !password) throw new Error("Enter your RISE/ACCA ID and password.");
+
+  const row = findStudentByAccaId_(accaId);
+  if (!row) throw new Error("Invalid RISE/ACCA ID or password.");
+
+  const hash = hashPassword_(password, row.PasswordSalt);
+  if (hash !== row.PasswordHash) throw new Error("Invalid RISE/ACCA ID or password.");
+
+  return studentRowToPublic_(row);
 }
 
 // ---------------------------------------------------------------------------

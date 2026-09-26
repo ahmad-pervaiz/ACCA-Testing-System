@@ -13,8 +13,9 @@ filterable results view — with **no paid services anywhere** in the stack.
   (`google-apps-script/Code.gs`) — completely free, no usage limits that a
   small school would ever hit
 - **Auth:** a single hardcoded faculty account (email + server-side
-  password) and password-less student identification (Name + RISE/ACCA
-  Student ID + Batch), both backed by a signed cookie — no auth provider
+  password), and real student accounts (email + salted-password-hash in a
+  `Students` sheet, since RISE issues no institutional email to derive a
+  login from) — both backed by a signed cookie, no auth provider
 - **Exam timer:** server-anchored in a `Sessions` sheet — a student can
   refresh, close the tab, or switch devices and the countdown is exactly
   where it should be
@@ -74,7 +75,8 @@ npm run dev
 
 - Faculty: `/teacher/login` with `alipervaiz.ca269@gmail.com` (or whatever
   you set `NEXT_PUBLIC_TEACHER_EMAIL` to) + `TEACHER_PASSWORD`
-- Students: `/student/login`, just Name + Student ID + Batch, no password
+- Students: `/student/register` once (Name, email, RISE/ACCA ID, batch,
+  password), then `/student/login` with RISE/ACCA ID + password
 
 > If your project directory lives on an NTFS/exFAT mount, `node_modules`
 > there is extremely slow. Symlink it to a native-filesystem location
@@ -82,16 +84,19 @@ npm run dev
 
 ## The trade-off, stated plainly
 
-Students are **not authenticated** — there is no password check, so
-anyone who knows (or guesses) a Student ID can submit a result under that
-name. This is the direct cost of "no paid database, no auth provider": a
-real per-student credential would need somewhere trusted to store a
-password hash, which is exactly the kind of service this version removes.
-For a low-stakes practice-mock tool inside a school where the teacher
-already knows their students, that trade is usually fine — just know it's
-being made. Duplicate attempts are still blocked (one result per
-mock+Student ID, enforced in `Code.gs`), and the teacher's own account is
-still a real password check.
+Students **are** authenticated — registration collects Name, a personal
+email (RISE issues no institutional one), RISE/ACCA ID, batch, and a
+password; login checks RISE/ACCA ID + password against a salted hash
+stored in the `Students` sheet (`google-apps-script/Code.gs` ->
+`hashPassword_`). The one real trade-off: Apps Script has no bcrypt/argon2
+library, so the hash is salted SHA-256 — far better than plaintext, but
+weaker than a proper password-hashing algorithm if the underlying Sheet
+were ever exposed. For a school's practice-mock tool this is a reasonable
+line to draw for a zero-infrastructure backend; it's not what you'd want
+for anything holding real financial or personal data. Duplicate exam
+attempts are still blocked (one result per mock+RISE ID, enforced in
+`Code.gs`), and the teacher's own account is a separate, server-only
+password check.
 
 ## Creating a mock (teacher)
 
