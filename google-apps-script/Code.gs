@@ -84,10 +84,14 @@ function ensureSheet_(ss, name, headers) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-  }
+  // Always (re)write row 1 to match the headers this code expects — every
+  // read keys off this exact header text (readRows_ does row[headers[c]] =
+  // values[i][c]), so a stale or hand-typed header row silently breaks
+  // every lookup while leaving the data rows below untouched and intact.
+  // Only writing headers "if empty" (the previous behavior) let a
+  // pre-existing sheet's header row drift out of sync forever.
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
   return sheet;
 }
 
