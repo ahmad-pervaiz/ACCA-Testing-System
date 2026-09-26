@@ -48,15 +48,46 @@ function scriptUrl(): string {
  * Confirmed empirically against a live deployment — don't "fix" this back to
  * preserving the method without re-testing against a real deployment.
  */
+async function fetchOnce(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(url, { ...init, redirect: "manual", signal: controller.signal });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (location) {
+        return fetch(location, { method: "GET", redirect: "follow", signal: controller.signal });
+      }
+    }
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const RETRY_DELAYS_MS = [500, 1500];
+
+/**
+ * Retries on network-level failures (DNS/connection/timeout — a thrown
+ * TypeError, not an HTTP error status). This environment's outbound network
+ * has repeatedly shown transient ETIMEDOUT blips to external hosts; Code.gs's
+ * write actions (registerStudent, submitExam, ...) already guard against
+ * duplicate side effects if a request that timed out client-side actually
+ * landed server-side, so retrying is safe here.
+ */
 async function fetchFollowingRedirect(url: string, init: RequestInit): Promise<Response> {
-  const response = await fetch(url, { ...init, redirect: "manual" });
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers.get("location");
-    if (location) {
-      return fetch(location, { method: "GET", redirect: "follow" });
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fetchOnce(url, init);
+    } catch (err) {
+      lastError = err;
+      if (attempt < RETRY_DELAYS_MS.length) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+      }
     }
   }
-  return response;
+  throw lastError;
 }
 
 interface ScriptEnvelope<T> {
