@@ -28,13 +28,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <p className="rounded-md bg-danger-bg px-3 py-2 text-sm text-danger">{state.error}</p>
         )}
 
-        <Button type="submit" disabled={pending || !token} className="mt-2">
+        <Button type="submit" variant="accent" disabled={pending || !token} className="mt-2">
           {pending ? "Resetting…" : "Reset Password"}
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        <Link href="/student/login" className="font-medium text-brand hover:underline">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <Link href="/student/login" className="font-medium text-accent hover:underline">
           Back to sign in
         </Link>
       </p>

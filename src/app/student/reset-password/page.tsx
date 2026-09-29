@@ -1,5 +1,4 @@
-import { BrandHeader } from "@/components/shared/brand-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthSplitLayout } from "@/components/shared/auth-split-layout";
 import { ResetPasswordForm } from "./reset-password-form";
 
 export default async function ResetPasswordPage({
@@ -10,24 +9,22 @@ export default async function ResetPasswordPage({
   const { token } = await searchParams;
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
-      <BrandHeader tagline="Student Portal" />
+    <AuthSplitLayout
+      eyebrow="Student Portal"
+      headline="Where every mock brings exam day closer."
+      subtext="Choose a new password for your account."
+    >
+      <div className="mb-6 rounded-lg border border-border bg-surface-muted px-4 py-2.5 text-center text-sm font-semibold text-foreground">
+        Set a New Password
+      </div>
 
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Set a New Password</CardTitle>
-          <CardDescription>Choose a new password for your account.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {token ? (
-            <ResetPasswordForm token={token} />
-          ) : (
-            <p className="rounded-md bg-danger-bg px-3 py-2 text-sm text-danger">
-              This reset link is missing its token. Request a new one from the login page.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+      {token ? (
+        <ResetPasswordForm token={token} />
+      ) : (
+        <p className="rounded-md bg-danger-bg px-3 py-2 text-sm text-danger">
+          This reset link is missing its token. Request a new one from the login page.
+        </p>
+      )}
+    </AuthSplitLayout>
   );
 }

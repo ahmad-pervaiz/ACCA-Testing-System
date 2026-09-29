@@ -11,7 +11,7 @@
   --brand: #0b3d68;
   --brand-foreground: #ffffff;
   --brand-light: #e8f0f8;
-  --accent: #c68a2e;
+  --accent: #d97e1e;
   --accent-foreground: #ffffff;
 
   --success: #15803d;
@@ -23,7 +23,78 @@
   --info: #1d4ed8;
   --info-bg: #eff6ff;
 
+  /* Dark-navy auth hero panel — same in both themes, it's a fixed dark
+     surface (like the reference design's left panel), not tied to
+     light/dark mode. */
+  --hero: #0f1b2e;
+  --hero-foreground: #f4f1ea;
+  --hero-muted: #a7b0c0;
+  --hero-border: #24334d;
+  --hero-chip: #17233a;
+
   --radius: 0.625rem;
+}
+
+:root[data-theme="dark"] {
+  --background: #0b1120;
+  --surface: #121a2c;
+  --surface-muted: #182236;
+  --foreground: #eef1f6;
+  --muted-foreground: #93a0b8;
+  --border: #253352;
+
+  --brand: #4d8fca;
+  --brand-foreground: #08131f;
+  --brand-light: #16233a;
+  --accent: #eb9a3d;
+  --accent-foreground: #201404;
+
+  --success: #34d399;
+  --success-bg: #0c2a20;
+  --danger: #f87171;
+  --danger-bg: #2c1212;
+  --warning: #fbbf24;
+  --warning-bg: #2b1d05;
+  --info: #60a5fa;
+  --info-bg: #0f1f38;
+
+  --hero: #060b16;
+  --hero-foreground: #f4f1ea;
+  --hero-muted: #8b93a6;
+  --hero-border: #1c2740;
+  --hero-chip: #0c1526;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0b1120;
+    --surface: #121a2c;
+    --surface-muted: #182236;
+    --foreground: #eef1f6;
+    --muted-foreground: #93a0b8;
+    --border: #253352;
+
+    --brand: #4d8fca;
+    --brand-foreground: #08131f;
+    --brand-light: #16233a;
+    --accent: #eb9a3d;
+    --accent-foreground: #201404;
+
+    --success: #34d399;
+    --success-bg: #0c2a20;
+    --danger: #f87171;
+    --danger-bg: #2c1212;
+    --warning: #fbbf24;
+    --warning-bg: #2b1d05;
+    --info: #60a5fa;
+    --info-bg: #0f1f38;
+
+    --hero: #060b16;
+    --hero-foreground: #f4f1ea;
+    --hero-muted: #8b93a6;
+    --hero-border: #1c2740;
+    --hero-chip: #0c1526;
+  }
 }
 
 @theme inline {
@@ -46,6 +117,11 @@
   --color-warning-bg: var(--warning-bg);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-hero-muted: var(--hero-muted);
+  --color-hero-border: var(--hero-border);
+  --color-hero-chip: var(--hero-chip);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

@@ -43,3 +43,6 @@ next-env.d.ts
 
 # local tooling state
 .claude/
+
+# personal design reference (screenshots of other products, not project source)
+/UI design Guide/
