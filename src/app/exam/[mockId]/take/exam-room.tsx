@@ -110,7 +110,7 @@ export function ExamRoom({
       <header className="sticky top-0 z-10 border-b border-border bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <Image src="/branding/logo.jpeg" alt="" width={32} height={32} className="rounded object-cover" />
+            <Image src="/branding/logo.jpeg" alt="" width={32} height={32} className="h-8 w-8 rounded object-cover" />
             <div>
               <p className="text-sm font-semibold text-foreground">{mock.mock_name}</p>
               <p className="text-xs text-muted-foreground">{SCHOOL_NAME}</p>

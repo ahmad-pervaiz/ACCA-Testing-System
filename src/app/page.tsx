@@ -14,7 +14,7 @@ export default function Home() {
           alt={`${SCHOOL_NAME} logo`}
           width={72}
           height={72}
-          className="rounded-xl object-cover shadow-sm"
+          className="h-[72px] w-[72px] rounded-xl object-cover shadow-sm"
         />
         <div>
           <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">{SCHOOL_NAME}</h1>

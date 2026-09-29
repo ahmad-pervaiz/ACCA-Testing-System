@@ -10,7 +10,7 @@ export function BrandHeader({ tagline }: { tagline?: string }) {
         alt={`${SCHOOL_NAME} logo`}
         width={44}
         height={44}
-        className="rounded-md object-cover"
+        className="h-11 w-11 rounded-md object-cover"
       />
       <div>
         <p className="text-base font-semibold leading-tight text-foreground">{SCHOOL_NAME}</p>

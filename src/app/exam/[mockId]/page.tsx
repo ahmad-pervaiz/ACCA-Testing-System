@@ -37,7 +37,7 @@ export default async function PreExamPage({
           alt={`${SCHOOL_NAME} logo`}
           width={64}
           height={64}
-          className="rounded-xl object-cover"
+          className="h-16 w-16 rounded-xl object-cover"
         />
         <p className="text-sm font-medium text-muted-foreground">{SCHOOL_NAME}</p>
       </div>
