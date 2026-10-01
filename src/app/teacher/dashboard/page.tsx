@@ -8,6 +8,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
+import { DeleteMockButton } from "./delete-mock-button";
 
 const TEACHER_LINKS = [
   { href: "/teacher/dashboard", label: "Dashboard" },
@@ -86,10 +87,13 @@ export default async function TeacherDashboardPage() {
                         </Badge>
                       </td>
                       <td className="px-5 py-3 text-muted-foreground">{formatDate(m.created_at)}</td>
-                      <td className="px-5 py-3 text-right">
-                        <Link href={`/teacher/review/${m.id}`} className="font-medium text-brand hover:underline">
-                          {m.status === "draft" ? "Review & Publish" : "Edit"}
-                        </Link>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          <Link href={`/teacher/review/${m.id}`} className="font-medium text-brand hover:underline">
+                            {m.status === "draft" ? "Review & Publish" : "Edit"}
+                          </Link>
+                          <DeleteMockButton mockId={m.id} mockName={m.mock_name} />
+                        </div>
                       </td>
                     </tr>
                   ))}

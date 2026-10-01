@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { saveMockDraft, publishMock } from "@/lib/actions/mocks";
+import { Dialog } from "@/components/ui/dialog";
+import { saveMockDraft, publishMock, deleteMock } from "@/lib/actions/mocks";
 import { BATCHES } from "@/lib/constants";
 import type { Mock, Question, OptionLetter } from "@/lib/types";
 
@@ -31,6 +32,8 @@ export function ReviewEditor({
   const [expanded, setExpanded] = useState<number | null>(0);
   const [saving, startSaving] = useTransition();
   const [publishing, startPublishing] = useTransition();
+  const [deleting, startDeleting] = useTransition();
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const totalMarks = useMemo(() => questions.reduce((s, q) => s + (q.marks || 0), 0), [questions]);
 
@@ -102,7 +105,20 @@ export function ReviewEditor({
     });
   }
 
-  const busy = saving || publishing;
+  function handleDelete() {
+    startDeleting(async () => {
+      const res = await deleteMock(mock.id);
+      if (res.error) {
+        toast.error(res.error);
+        setConfirmDeleteOpen(false);
+      } else {
+        toast.success(`${mockName} deleted.`);
+        router.push("/teacher/dashboard");
+      }
+    });
+  }
+
+  const busy = saving || publishing || deleting;
 
   return (
     <div className="flex flex-col gap-6">
@@ -189,15 +205,54 @@ export function ReviewEditor({
         ))}
       </div>
 
-      <div className="sticky bottom-4 flex justify-end gap-3 rounded-xl border border-border bg-surface p-4 shadow-lg">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => handleSave()}>
-          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save Draft"}
+      <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 shadow-lg">
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => setConfirmDeleteOpen(true)}
+          className="text-danger hover:bg-danger-bg"
+        >
+          <Trash2 className="h-4 w-4" /> Delete Mock
         </Button>
-        <Button type="button" variant="accent" disabled={busy} onClick={handlePublish}>
-          <Rocket className="h-4 w-4" />
-          {publishing ? "Publishing…" : mock.status === "published" ? "Republish" : "Publish to Students"}
-        </Button>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" disabled={busy} onClick={() => handleSave()}>
+            <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save Draft"}
+          </Button>
+          <Button type="button" variant="accent" disabled={busy} onClick={handlePublish}>
+            <Rocket className="h-4 w-4" />
+            {publishing ? "Publishing…" : mock.status === "published" ? "Republish" : "Publish to Students"}
+          </Button>
+        </div>
       </div>
+
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Delete this mock?"
+        description={`"${mockName}" will be permanently removed. This cannot be undone.`}
+      >
+        <div className="flex flex-col gap-4">
+          {mock.status === "published" && (
+            <p className="rounded-md bg-warning-bg px-3 py-2 text-sm text-warning">
+              This mock is published — students may currently be assigned to it. Deleting it
+              removes it immediately for everyone.
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            If any student has already completed this mock, deletion will be refused — archive it
+            instead so they can still review their attempt.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "Deleting…" : "Delete Permanently"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

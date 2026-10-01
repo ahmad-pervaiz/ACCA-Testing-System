@@ -73,3 +73,15 @@ export async function archiveMock(mockId: string): Promise<{ error?: string }> {
     return { error: err instanceof Error ? err.message : "Could not archive." };
   }
 }
+
+/** Refused if the mock already has student results — archive it instead. */
+export async function deleteMock(mockId: string): Promise<{ error?: string }> {
+  await requireTeacher();
+  try {
+    await sheets.deleteMock(mockId);
+    revalidatePath("/teacher/dashboard");
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not delete." };
+  }
+}

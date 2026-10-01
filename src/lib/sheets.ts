@@ -228,6 +228,11 @@ export function archiveMock(id: string): Promise<{ id: string; status: string }>
   return scriptPost("archiveMock", { id, teacherToken: teacherToken() });
 }
 
+/** Refused by Code.gs if the mock already has student results — archive those instead. */
+export function deleteMock(id: string): Promise<{ id: string }> {
+  return scriptPost<{ id: string }>("deleteMock", { id, teacherToken: teacherToken() });
+}
+
 // ---------------------------------------------------------------------------
 // Exam sessions
 // ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@
 
 // Bump this string whenever you need to prove a redeploy actually took —
 // call ?action=ping and compare against what this file says right now.
-const SCRIPT_VERSION = "2026-09-26-email-login-reset-1";
+const SCRIPT_VERSION = "2026-10-01-delete-mock-1";
 
 const SHEET_MOCKS = "Mocks";
 const SHEET_RESULTS = "Results";
@@ -156,6 +156,9 @@ function doPost(e) {
       case "archiveMock":
         requireTeacher_(body.teacherToken);
         return setMockStatus_(body.id, "archived");
+      case "deleteMock":
+        requireTeacher_(body.teacherToken);
+        return deleteMock_(body.id);
       case "registerStudent":
         return registerStudent_(body);
       case "studentLogin":
@@ -582,6 +585,29 @@ function setMockStatus_(id, status) {
   sheet.getRange(row._row, MOCKS_HEADERS.indexOf("Status") + 1).setValue(status);
   sheet.getRange(row._row, MOCKS_HEADERS.indexOf("UpdatedAt") + 1).setValue(new Date().toISOString());
   return { id: id, status: status };
+}
+
+/**
+ * Permanently removes a mock's row. Refuses if any student already has a
+ * result for it — deleting the Mocks row would break getMockForReview_ for
+ * those students (their result page needs the question/answer data to
+ * render the itemized review). Archive instead in that case; archived
+ * mocks are hidden from students but keep everything intact.
+ */
+function deleteMock_(id) {
+  const row = getMockRow_(id);
+
+  const hasResults = findRow_(sheet_(SHEET_RESULTS), function (r) {
+    return r.MockID === id;
+  });
+  if (hasResults) {
+    throw new Error(
+      "This mock already has student results — archive it instead so those students can still review their attempt.",
+    );
+  }
+
+  sheet_(SHEET_MOCKS).deleteRow(row._row);
+  return { id: id };
 }
 
 // ---------------------------------------------------------------------------
