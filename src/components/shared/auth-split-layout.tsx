@@ -5,7 +5,9 @@ import { Clock, CheckCircle2, BookOpenCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SCHOOL_NAME } from "@/lib/constants";
 
-const FEATURES = [
+export const HEADLINE = "Where every mock brings exam day closer.";
+
+export const FEATURES = [
   { icon: Clock, text: "A live countdown timer that survives a refresh or crash" },
   { icon: CheckCircle2, text: "Instant scoring with itemized, explained results" },
   { icon: BookOpenCheck, text: "Practice across every paper and batch your teacher publishes" },
